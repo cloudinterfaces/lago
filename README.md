@@ -6,11 +6,12 @@ This utility allows uploading and downloading existing Lambda functions and depl
 ```go get github.com/cloudinterfaces/lago``` and put the resulting binary somewhere in your PATH.
 
 ## Usage
+```
 get - download a Lambda function to a directory
 put - upload the contents of a directory to a Lambda function
 deploy - compile and run Go source and upload to a Lambda function
-
-See help (-? flag on CLI) until it says to refer back to this.
+```
+See help (-? flag) until it says to refer back to this.
 
 ## Static files
 ```lago deploy``` allows static files to be uploaded with the compiled handler. They are specified on the commandline as:
