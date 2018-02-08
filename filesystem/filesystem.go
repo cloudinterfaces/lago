@@ -11,21 +11,21 @@ import (
 )
 
 var badguys = map[string]struct{}{
-	".go":      struct{}{},
-	".c":       struct{}{},
-	".h":       struct{}{},
-	".cc":      struct{}{},
-	".cpp":     struct{}{},
-	".cxx":     struct{}{},
-	".hh":      struct{}{},
-	".hpp":     struct{}{},
-	".hxx":     struct{}{},
-	".m":       struct{}{},
-	".s":       struct{}{},
-	".S":       struct{}{},
-	".swig":    struct{}{},
-	".swigcxx": struct{}{},
-	".syso":    struct{}{},
+	".go":      {},
+	".c":       {},
+	".h":       {},
+	".cc":      {},
+	".cpp":     {},
+	".cxx":     {},
+	".hh":      {},
+	".hpp":     {},
+	".hxx":     {},
+	".m":       {},
+	".s":       {},
+	".S":       {},
+	".swig":    {},
+	".swigcxx": {},
+	".syso":    {},
 }
 
 func zipfile(zw *zip.Writer, root, base string, allfiles bool, f *os.File, stat os.FileInfo) error {
