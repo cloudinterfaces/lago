@@ -55,6 +55,7 @@ var Debug = flag.Bool("debug", false, "Verbose error log")
 // Lambda is a shared Lambda API instance.
 var svc *lambda.Lambda
 
+// Region is the AWS region.
 var Region = flag.String("region", defaultregion(), "AWS region, overridden by environment AWS_REGION")
 
 func list() {
