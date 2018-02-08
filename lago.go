@@ -221,10 +221,7 @@ func put(args []string) {
 func deploy(args []string) {
 	fs := flag.NewFlagSet("deploy", flag.ExitOnError)
 	fs.Usage = usage(`Usage of lago deploy:
-lago [flags] deploy [-handler handlername] funcname buildtarget {[base(;:)]path}
-	
-	-handler specifies the handler name 
-(it is "hello" initially for Go lambda functions created in web interface)
+lago [flags] deploy funcname buildtarget {[base(;:)]path}
 
 	funcname is the Lambda function name
 
@@ -243,7 +240,6 @@ recursively if a trailing separator exists, non-recursively otherwise
 
 	Flags:
 	`, fs.PrintDefaults)
-	handlername := fs.String("handler", "", "Handler (executable) name, defaults to function name")
 	allfiles := fs.Bool("all", false, "Do not exclude source files if static files specified")
 	err := fs.Parse(args)
 	if err != nil {
@@ -257,15 +253,23 @@ recursively if a trailing separator exists, non-recursively otherwise
 	if len(fn) == 0 {
 		log.Fatal("Function required")
 	}
-	if len(*handlername) == 0 {
-		*handlername = fn
-	}
-	if strings.IndexAny(*handlername, `/\`) != -1 {
-		log.Fatalf("Bad function name: %s", *handlername)
-	}
 	target := fs.Arg(1)
 	if len(target) == 0 {
 		log.Fatal("Build target required")
+	}
+	var handlername string
+	{
+		input := lambda.GetFunctionConfigurationInput{
+			FunctionName: &fn,
+		}
+		res, err := svc.GetFunctionConfiguration(&input)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if r := *res.Runtime; r != `go1.x` {
+			log.Fatalf("Runtime for %s is %s", fn, r)
+		}
+		handlername = *res.Handler
 	}
 	td, err := ioutil.TempDir("", "lmao-")
 	if err != nil {
@@ -277,7 +281,7 @@ recursively if a trailing separator exists, non-recursively otherwise
 	default:
 		defer os.RemoveAll(td)
 	}
-	execfile := filepath.Join(td, *handlername)
+	execfile := filepath.Join(td, handlername)
 	cmd := exec.Command(gobin, "build", "-o", execfile, target)
 	if lt := os.Getenv("LAMBDA_TAGS"); len(lt) > 0 {
 		cmd = exec.Command(gobin, "build", "-o", execfile, "-tags", lt, target)
