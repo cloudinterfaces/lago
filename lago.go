@@ -27,6 +27,12 @@ func init() {
 	log.SetPrefix("lago: ")
 }
 
+func check(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func usage(s string, f func()) func() {
 	log.SetPrefix("")
 	return func() {
@@ -80,9 +86,7 @@ func get(args []string) {
 	Flags:
 	`, fs.PrintDefaults)
 	err := fs.Parse(args)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	fn := fs.Arg(0)
 	if len(fn) == 0 {
 		log.Fatal("Function name required")
@@ -92,9 +96,7 @@ func get(args []string) {
 		log.Fatal("Output directory required")
 	}
 	f, err := os.Open(odir)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	defer f.Close()
 	names, err := f.Readdirnames(-1)
 	if err != nil && err != io.EOF {
@@ -115,63 +117,39 @@ func get(args []string) {
 			}
 		}
 		for _, name := range names {
-			if err = os.RemoveAll(filepath.Join(odir, name)); err != nil {
-				log.Fatal(err)
-			}
+			err = os.RemoveAll(filepath.Join(odir, name))
+			check(err)
 		}
 	}
 	input := &lambda.GetFunctionInput{FunctionName: &fn}
 	res, err := svc.GetFunction(input)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	tf, err := ioutil.TempFile("", "")
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	defer os.Remove(tf.Name())
 	defer tf.Close()
 	get, err := http.Get(*res.Code.Location)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	defer get.Body.Close()
 	_, err = io.Copy(tf, get.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	_, err = tf.Seek(0, 0)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	st, err := tf.Stat()
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	r, err := zip.NewReader(tf, st.Size())
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	for _, f := range r.File {
 		dir, _ := path.Split(f.Name)
 		if len(dir) > 0 {
-			err := os.MkdirAll(filepath.Join(odir, filepath.FromSlash(dir)), 0755)
-			if err != nil {
-				log.Fatal(err)
-			}
+			check(os.MkdirAll(filepath.Join(odir, filepath.FromSlash(dir)), 0755))
 		}
 		of, err := os.Create(filepath.Join(odir, filepath.FromSlash(f.Name)))
-		if err != nil {
-			log.Fatal(err)
-		}
+		check(err)
 		zr, err := f.Open()
-		if err != nil {
-			log.Fatal(err)
-		}
+		check(err)
 		_, err = io.Copy(of, zr)
-		if err != nil {
-			log.Fatal(err)
-		}
+		check(err)
 		of.Close()
 		zr.Close()
 	}
@@ -239,13 +217,9 @@ Flags:
 	Func := fs.String("func", "", "Lambda function name")
 	Target := fs.String("target", "", "Build target (Go source file or main package directory)")
 	err := fs.Parse(args)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	gobin, err := exec.LookPath("go")
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	fn := *Func
 	if len(fn) == 0 {
 		log.Fatal("Flag -func missing")
@@ -260,18 +234,14 @@ Flags:
 			FunctionName: &fn,
 		}
 		res, err := svc.GetFunctionConfiguration(&input)
-		if err != nil {
-			log.Fatal(err)
-		}
+		check(err)
 		if r := *res.Runtime; r != `go1.x` {
 			log.Fatalf("Runtime for %s is %s", fn, r)
 		}
 		handlername = *res.Handler
 	}
 	td, err := ioutil.TempDir("", "lmao-")
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	switch *Debug {
 	case true:
 		log.Println("Preserving temporary directory:", td)
@@ -292,27 +262,17 @@ Flags:
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
 	f, err := os.Open(execfile)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	defer f.Close()
 	fi, err := f.Stat()
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	zh, err := zip.FileInfoHeader(fi)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	zh.SetMode(0555)
 	w, err := zw.CreateHeader(zh)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	_, err = io.Copy(w, f)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	if args := fs.Args(); len(args) > 0 {
 		sep := string(os.PathListSeparator)
 		for _, a := range args {
@@ -326,14 +286,10 @@ Flags:
 			if strings.HasSuffix(filename, sep) {
 				f = filesystem.ZipWalk
 			}
-			if err := f(zw, filename, base, *allfiles); err != nil {
-				log.Fatal(err)
-			}
+			check(f(zw, filename, base, *allfiles))
 		}
 	}
-	if err = zw.Close(); err != nil {
-		log.Fatal(err)
-	}
+	check(zw.Close())
 	if *Debug {
 		log.Println("Writing zipfile.zip to temporary directory")
 		zipfile := filepath.Join(td, "zipfile.zip")
@@ -353,9 +309,7 @@ Flags:
 		ZipFile:      buf.Bytes(),
 	}
 	_, err = svc.UpdateFunctionCode(params)
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 }
 
 func main() {
