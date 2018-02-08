@@ -221,26 +221,23 @@ func put(args []string) {
 func deploy(args []string) {
 	fs := flag.NewFlagSet("deploy", flag.ExitOnError)
 	fs.Usage = usage(`Usage of lago deploy:
-lago [flags] deploy funcname buildtarget {[base(;:)]path}
+lago [flags] deploy -func funcname -target buildtarget [-all] {[base(;:)]path}
 
-	funcname is the Lambda function name
-
-	buildtarget is a Go file or a directory containing a 
-	buildable "main" package
-
-The optional {[base:]path} entries add static files to the Lambda function,
+The optional {[base:]path} arguments add static files to the Lambda function,
 which is useful for template files, executables, or even storing the source
 of a function in Lambda. The base component specifies the path within
 the Lambda environment. The path component specifies a file that exists in the
 local filesystem. If path is a regular file, the Lambda environment will contain
 base/filename. If base is not specified or empty, filename will exist in the
 root of the Lambda environment. If path is a directory, the contents are added
-recursively if a trailing separator exists, non-recursively otherwise 
+recursively if a trailing separator exists, non-recursively otherwise
 (see README.md).
 
-	Flags:
-	`, fs.PrintDefaults)
+Flags:
+			`, fs.PrintDefaults)
 	allfiles := fs.Bool("all", false, "Do not exclude source files if static files specified")
+	Func := fs.String("func", "", "Lambda function name")
+	Target := fs.String("target", "", "Build target (Go source file or main package directory)")
 	err := fs.Parse(args)
 	if err != nil {
 		log.Fatal(err)
@@ -249,13 +246,13 @@ recursively if a trailing separator exists, non-recursively otherwise
 	if err != nil {
 		log.Fatal(err)
 	}
-	fn := fs.Arg(0)
+	fn := *Func
 	if len(fn) == 0 {
-		log.Fatal("Function required")
+		log.Fatal("Flag -func missing")
 	}
-	target := fs.Arg(1)
+	target := *Target
 	if len(target) == 0 {
-		log.Fatal("Build target required")
+		log.Fatal("Flag -target required")
 	}
 	var handlername string
 	{
@@ -316,9 +313,8 @@ recursively if a trailing separator exists, non-recursively otherwise
 	if err != nil {
 		log.Fatal(err)
 	}
-	if args := fs.Args(); len(args) > 2 {
+	if args := fs.Args(); len(args) > 0 {
 		sep := string(os.PathListSeparator)
-		args = args[2:]
 		for _, a := range args {
 			var base, filename string
 			parts := strings.SplitN(a, sep, 2)

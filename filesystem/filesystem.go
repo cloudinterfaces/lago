@@ -46,7 +46,7 @@ func Zip(zw *zip.Writer, root, base string, allfiles bool) error {
 		}
 		if !allfiles {
 			if _, ok := badguys[filepath.Ext(root)]; ok {
-				return fmt.Errorf("Allfiles not specified: %s", root)
+				return fmt.Errorf("All files not specified: %s", root)
 			}
 		}
 		zh, err := zip.FileInfoHeader(stat)
