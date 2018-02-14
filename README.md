@@ -7,6 +7,8 @@ This utility allows uploading and downloading existing Lambda functions and depl
 
 ## Usage
 ```
+list - list Lambda functions 
+versions - show versions of a Lambda function
 get - download a Lambda function to a directory
 put - upload the contents of a directory to a Lambda function
 deploy - compile and run Go source and upload to a Lambda function
@@ -52,4 +54,5 @@ If ```opt:/opt/``` (/opt already exists in the Lambda function filesystem) is sp
 Note the maximum upload size of a Lambda function is 50 megabytes and themaximum unpacked size must be less than 250 megabytes. Note also thoughtless uploading of files may damage the Lambda runtime environment, which is based on Amazon Linux (for example ```etc:/etc/resolv.conf``` is probably a very bad idea).
 
 ## Related
-The [lh](https://github.com/cloudinterfaces/lh) package makes it easy to deploy (many or most) http.Handlers with the AWS Lambda Go runtime.
+The [lh](https://github.com/cloudinterfaces/lh) package makes it easy to serve (many or most) http.Handlers with the AWS Lambda Go runtime.
+The [lrpc](https://github.com/cloudinterfaces/lrpc) packages make it easy to deploy net/rpc Servers to Lambda that support gob and JSON-RPC calls via AWS, and a client that allows net/rpc Client calls to such servers.

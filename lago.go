@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -66,7 +68,9 @@ func list() {
 			log.Fatal(err)
 		}
 		for _, f := range res.Functions {
-			fmt.Println(*f.FunctionName)
+			if *f.Runtime == `go1.x` {
+				fmt.Println(*f.FunctionName)
+			}
 		}
 		if res.NextMarker == nil {
 			break
@@ -75,9 +79,50 @@ func list() {
 	}
 }
 
+func versions(args []string) {
+	print := fmt.Printf
+	fs := flag.NewFlagSet("versions", flag.ExitOnError)
+	long := fs.Bool("l", false, "Long output")
+	check(fs.Parse(args))
+	fn := fs.Arg(0)
+	if len(fn) == 0 {
+		log.Fatal("Function name required")
+	}
+	req := &lambda.ListVersionsByFunctionInput{
+		FunctionName: &fn,
+	}
+	if *long {
+		os.Stdout.Write([]byte{'\n'})
+		w := new(tabwriter.Writer)
+		w.Init(os.Stdout, 16, 8, 0, '\t', 0)
+		print = func(f string, i ...interface{}) (int, error) {
+			return fmt.Fprintf(w, f, i...)
+		}
+		print("Version\tModified\tSHA256[:8]\n")
+		defer w.Flush()
+	}
+	for {
+		res, err := svc.ListVersionsByFunction(req)
+		check(err)
+		for _, c := range res.Versions {
+			switch *long {
+			case true:
+				buf, _ := base64.StdEncoding.DecodeString(*c.CodeSha256)
+				print("%s\t%s\t%x\n", *c.Version, *c.LastModified, buf[:8])
+			default:
+				print("%s\n", *c.Version)
+			}
+		}
+		if req.Marker = res.NextMarker; req.Marker == nil {
+			break
+		}
+	}
+}
+
 func get(args []string) {
 	fs := flag.NewFlagSet("get", flag.ExitOnError)
 	force := fs.Bool("f", false, "Force purge of destination")
+	version := fs.String("ver", "", "Version or alias")
 	fs.Usage = usage(`Usage of lago get:
 	lago [flags] get [-f] funcname destination_directory
 	
@@ -123,6 +168,9 @@ func get(args []string) {
 		}
 	}
 	input := &lambda.GetFunctionInput{FunctionName: &fn}
+	if len(*version) > 0 {
+		input.Qualifier = version
+	}
 	res, err := svc.GetFunction(input)
 	check(err)
 	tf, err := ioutil.TempFile("", "")
@@ -163,6 +211,7 @@ func put(args []string) {
 
 	All files in directory will be uploaded recursively to the function funcname.
 		`, fs.PrintDefaults)
+	version := fs.Bool("ver", false, "Create new version")
 	err := fs.Parse(args)
 	if err != nil {
 		log.Fatal(err)
@@ -191,9 +240,15 @@ func put(args []string) {
 		FunctionName: &fn,
 		ZipFile:      tf.Bytes(),
 	}
-	_, err = svc.UpdateFunctionCode(params)
-	if err != nil {
-		log.Fatal(err)
+	ufc, err := svc.UpdateFunctionCode(params)
+	check(err)
+	if *version {
+		pv := &lambda.PublishVersionInput{
+			FunctionName: &fn,
+			RevisionId:   ufc.RevisionId,
+		}
+		_, err = svc.PublishVersion(pv)
+		check(err)
 	}
 }
 
@@ -217,6 +272,7 @@ Flags:
 	allfiles := fs.Bool("all", false, "Do not exclude source files if static files specified")
 	Func := fs.String("func", "", "Lambda function name")
 	Target := fs.String("target", "", "Build target (Go source file or main package directory)")
+	version := fs.Bool("ver", false, "Create new version")
 	err := fs.Parse(args)
 	check(err)
 	gobin, err := exec.LookPath("go")
@@ -309,8 +365,16 @@ Flags:
 		FunctionName: &fn,
 		ZipFile:      buf.Bytes(),
 	}
-	_, err = svc.UpdateFunctionCode(params)
+	ufc, err := svc.UpdateFunctionCode(params)
 	check(err)
+	if *version {
+		pv := &lambda.PublishVersionInput{
+			FunctionName: &fn,
+			RevisionId:   ufc.RevisionId,
+		}
+		_, err = svc.PublishVersion(pv)
+		check(err)
+	}
 }
 
 func main() {
@@ -336,9 +400,11 @@ func main() {
 	svc = lambda.New(sess)
 	switch flag.Arg(0) {
 	case ``:
-		log.Fatal("Command required, list get put or deploy")
+		log.Fatal("Command required, list versions get put or deploy")
 	case `list`:
 		list()
+	case `versions`:
+		versions(flag.Args()[1:])
 	case `get`:
 		get(flag.Args()[1:])
 	case `put`:
